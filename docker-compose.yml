@@ -1,0 +1,51 @@
+networks:
+  private:
+
+volumes:
+  pg_data:
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=product
+    ports:
+      - :5432
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - private
+    restart: on-failure:2
+  
+  init:
+    image: tel-product:0.0.0
+    build:
+      context: .
+    environment:
+      - GOOSE_DRIVER=postgres
+      - GOOSE_DBSTRING=postgres://admin:admin@postgres:5432/product
+    command: /migration -dir=/data/migrations up
+    networks:
+      - private
+    depends_on:
+      - postgres
+    restart: on-failure
+
+  api:
+    image: tel-product:0.0.0
+    build:
+      context: .
+    command: /api
+    environment:
+      - ENV=development
+      - PORT=8080
+      - DSN=postgresql://admin:admin@postgres:5432/product
+    ports:
+      - 8080:8080
+    networks:
+      - private
+    depends_on:
+      - init
+    restart: on-failure
